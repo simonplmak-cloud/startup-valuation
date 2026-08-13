@@ -1,8 +1,18 @@
 import { NextResponse } from "next/server";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { AuditRequestSchema } from "@/lib/db/validation";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rl = rateLimit(`audit:${ip}`, 60, 60_000);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "RATE_LIMITED", message: "Too many requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter ?? 60) } },
+    );
+  }
+
   let body: unknown;
 
   try {
