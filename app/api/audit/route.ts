@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { AuditRequestSchema } from "@/lib/db/validation";
 import { rateLimit } from "@/lib/rate-limit";
+import { auth } from "@/lib/auth/config";
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
@@ -12,6 +13,9 @@ export async function POST(request: Request) {
       { status: 429, headers: { "Retry-After": String(rl.retryAfter ?? 60) } },
     );
   }
+
+  const session = await auth().catch(() => null);
+  const userId = session?.user?.id ? `user:${session.user.id}` : undefined;
 
   let body: unknown;
 
@@ -43,7 +47,7 @@ export async function POST(request: Request) {
     const valuationRunId = `valuation_run:${crypto.randomUUID()}`;
     const audit = await createAuditLog(
       valuationRunId,
-      undefined,
+      userId,
       method,
       inputs,
       result,
